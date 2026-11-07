@@ -46,13 +46,17 @@ The tests measure all of this: the harmonics, the level, the folding and the cli
 
 ## Install
 
-You need:
+You need a Mac with **macOS 26** (Tahoe) or later, Apple silicon or Intel. A USB CD/DVD drive is optional: the file player works without one.
 
-- A Mac with **macOS 26** (Tahoe) or later.
-- **Xcode 26**, or just its Command Line Tools (`xcode-select --install`), with Swift 6.2.
-- Optional: a USB CD/DVD drive for the CD player. The file player works without one.
+### Download (easiest)
 
-Then:
+1. Download **XENON-HiFi-…-macOS.zip** from the [latest release](https://github.com/EnriqueGPZ/xenon-hifi/releases/latest) and double-click it.
+2. Drag **CDPlayer.app** to your Applications folder.
+3. Open it. The first time, macOS says it can't check the developer, because the app is free and not signed by Apple. Click **Done**, then go to **System Settings ▸ Privacy & Security**, scroll down and click **Open Anyway** next to CDPlayer. You only do this once.
+
+### Build it yourself
+
+You also need **Xcode 26**, or just its Command Line Tools (`xcode-select --install`), with Swift 6.2. Then:
 
 ```bash
 git clone https://github.com/EnriqueGPZ/xenon-hifi.git
@@ -93,7 +97,7 @@ Tests and snapshots use a demo disc and library and never touch your saved setti
 
 - No streaming services, internet radio, or cover art from the internet.
 - No ripping CDs to files.
-- No signed and notarized download: build it yourself (that is how macOS lets an app from outside the App Store run without warnings).
+- The download is not notarized by Apple, so macOS asks you to confirm it once (see Install). Building it yourself avoids that.
 
 ## Credits
 

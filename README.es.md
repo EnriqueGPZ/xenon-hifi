@@ -45,13 +45,17 @@ Las pruebas miden todo esto (armónicos, nivel, tonos falsos y chasquidos) y est
 
 ## Instalar
 
-Necesitas:
+Necesitas un Mac con **macOS 26** (Tahoe) o posterior, con chip Apple o Intel. El lector de CD/DVD USB es opcional: el reproductor de archivos funciona sin él.
 
-- Un Mac con **macOS 26** (Tahoe) o posterior.
-- **Xcode 26**, o solo sus herramientas de línea de comandos (`xcode-select --install`), con Swift 6.2.
-- Opcional: un lector de CD/DVD USB para el reproductor de CD. El de archivos funciona sin él.
+### Descargar (lo más fácil)
 
-Después:
+1. Descarga **XENON-HiFi-…-macOS.zip** de la [última versión](https://github.com/EnriqueGPZ/xenon-hifi/releases/latest) y haz doble clic.
+2. Arrastra **CDPlayer.app** a la carpeta Aplicaciones.
+3. Ábrela. La primera vez, macOS dice que no puede comprobar el desarrollador, porque la app es gratuita y no está firmada por Apple. Pulsa **OK**, ve a **Ajustes del Sistema ▸ Privacidad y seguridad**, baja hasta el final y pulsa **Abrir igualmente** junto a CDPlayer. Solo se hace una vez.
+
+### Compilarla tú
+
+Además necesitas **Xcode 26**, o solo sus herramientas de línea de comandos (`xcode-select --install`), con Swift 6.2. Después:
 
 ```bash
 git clone https://github.com/EnriqueGPZ/xenon-hifi.git
@@ -90,7 +94,7 @@ Las pruebas y capturas usan un disco y una biblioteca de ejemplo, y nunca tocan 
 
 - Ni streaming, ni radio por internet, ni portadas de internet.
 - No pasa los CD a archivos.
-- No hay descarga firmada y notarizada: se compila en cada Mac. Es la forma de que macOS deje abrir una app de fuera de la App Store sin avisos.
+- La descarga no está notarizada por Apple, así que macOS pide confirmarla una vez (ver Instalar). Compilándola tú, no hay aviso.
 
 ## Créditos
 

@@ -35,6 +35,7 @@ Read `README.md` for what the app does and `docs/DESIGN-DECISIONS.md` before cha
 - **Build and install:** `./build.sh`. It installs `~/Applications/CDPlayer.app`; add `--open` to restart it with the new build.
   - Settings: `SIGN_IDENTITY` (signing certificate; the default is Apple Development, then ad hoc) and `BUNDLE_ID`.
   - Fix any warnings it shows.
+- **Release package:** `tools/release.sh` writes `dist/CDPlayer.app` and `dist/XENON-HiFi-<version>-macOS.zip` (universal, ad hoc unless `SIGN_IDENTITY`), without installing anything. The version is `CFBundleShortVersionString` in `Info.plist.in`.
 - **Unit tests:** `swift test --scratch-path ~/Library/Developer/CDPlayer/test-build`.
 - **Self-test:** `tools/selftest.sh` runs the real app's functions on a /tmp store and exits 0 when every check passes. Add a check in `SelfTest.swift` for any new logic.
 - **Snapshots, after every UI change:** run `tools/snap.sh`, then look at `/tmp/CDPlayer-shots/*-light.png` and `*-dark.png`.
