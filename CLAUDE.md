@@ -28,7 +28,7 @@ Read `README.md` for what the app does and `docs/DESIGN-DECISIONS.md` before cha
 - `Tests/CDPlayerKitTests/`: Swift Testing tests, including sound measurements (harmonics, level, aliasing, clicks).
 - `Resources/Tubes/`: the tube pictures (cold + glow layers), made by `tools/tube_layers.py`.
 - `Icon/AppIcon.icon`: Icon Composer file, compiled by `tools/make_icon.sh` (needs Xcode's `actool`; skipped without it).
-- `docs/`: the original brief, user stories, design decisions, and how it was made.
+- `docs/`: the original brief, user stories, design decisions, how it was made, and the sound explained (`SOUND.md`).
 
 ## Build and check
 

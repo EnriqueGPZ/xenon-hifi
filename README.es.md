@@ -4,6 +4,11 @@
 
 *[Read in English](README.md)*
 
+<p align="center">
+  <a href="https://github.com/EnriqueGPZ/xenon-hifi/releases/latest"><img src="https://img.shields.io/github/v/release/EnriqueGPZ/xenon-hifi?label=Descargar%20para%20Mac&style=for-the-badge&logo=apple&color=d4893a" alt="Descargar para Mac"></a>
+  <br><sub>macOS 26 o posterior · chip Apple e Intel · gratis y de código abierto</sub>
+</p>
+
 ![La torre XENON: ecualizador, previo a válvulas, reproductor de archivos y lector de CD con vúmetros](docs/images/stack.jpg)
 
 XENON es una app nativa de macOS, escrita en Swift y SwiftUI, que:
@@ -37,11 +42,13 @@ CD (lector USB) ─┐
 Archivos ────────┘    (balance)      (TP-4)       (EQ-10)
 ```
 
-- **Bit a bit con todo apagado.** La cadena trabaja a la frecuencia de la propia música, y la app pone el DAC a esa frecuencia antes de sonar. Nada se convierte por el camino.
+- **Bit a bit con las válvulas apagadas, el ecualizador plano y el volumen al máximo.** La cadena trabaja a la frecuencia de la propia música, y la app pone el DAC a esa frecuencia antes de sonar. Nada se convierte por el camino.
 - **Las válvulas** (`Sources/CDPlayerKit/Tube.swift`) usan una curva `tanh` con sesgo, el modelo clásico de un triodo en su punto de trabajo. Está ajustada para que el sonido flojo mantenga su nivel exacto y solo cambie el color. A frecuencias de CD trabaja a 4 veces la frecuencia, para que las notas agudas no generen tonos falsos. Al encender o apagar hace un fundido de 30 ms.
 - **Los medidores enseñan lo que oyes.** Las barras, las agujas, el brillo de las válvulas y las luces OVER escuchan después del ecualizador.
 
 Las pruebas miden todo esto (armónicos, nivel, tonos falsos y chasquidos) y están en `Tests/CDPlayerKitTests/`.
+
+**[El sonido: el camino, los algoritmos y la calidad](docs/SONIDO.md)** explica cada paso en detalle: el lector antisaltos, el cambio de frecuencia del DAC, el modelo de válvula y su sobremuestreo, los filtros del ecualizador, el volumen, los medidores y cuándo, exactamente, el sonido es bit a bit.
 
 ## Instalar
 

@@ -4,6 +4,11 @@
 
 *[Leer en español](README.es.md)*
 
+<p align="center">
+  <a href="https://github.com/EnriqueGPZ/xenon-hifi/releases/latest"><img src="https://img.shields.io/github/v/release/EnriqueGPZ/xenon-hifi?label=Download%20for%20Mac&style=for-the-badge&logo=apple&color=d4893a" alt="Download for Mac"></a>
+  <br><sub>macOS 26 or later · Apple silicon and Intel · free and open source</sub>
+</p>
+
 ![The XENON stack: equalizer, tube preamp, file player and CD player with VU meters](docs/images/stack.jpg)
 
 XENON is a native macOS app (Swift and SwiftUI) that plays physical CDs from a USB drive and high-resolution music files (FLAC, ALAC, WAV, AIFF, MP3). It shows them on a dot-matrix display, VU meters and a cover screen, and it can colour the sound with a tube stage and a 10-band equalizer.
@@ -38,11 +43,13 @@ CD (USB drive) ─┐
 Music files ────┘   (balance)  (TP-4)    (EQ-10)
 ```
 
-- **Bit-perfect when everything is off.** The chain runs at the music's own sample rate, and the app sets the DAC to that rate before it plays. Nothing is resampled on the way.
+- **Bit-perfect with the tubes off, the EQ flat and the volume at maximum.** The chain runs at the music's own sample rate, and the app sets the DAC to that rate before it plays. Nothing is resampled on the way.
 - **The tube stage** (`Sources/CDPlayerKit/Tube.swift`) uses a biased `tanh` curve, the classic model of a triode near its working point. It is scaled so quiet sound keeps exactly its level and only the colour changes. It runs 4× oversampled at CD rates, so high notes do not fold back as false tones. Switching it on or off fades over 30 ms.
 - **Meters show what you hear.** The bars, the needles, the tube glow and the OVER lights all listen after the equalizer.
 
 The tests measure all of this: the harmonics, the level, the folding and the clicks. They are in `Tests/CDPlayerKitTests/`.
+
+**[Sound: the path, the algorithms and the quality](docs/SOUND.md)** explains every step in detail: the anti-skip reader, the DAC rate switching, the tube model and its oversampling, the EQ filters, the volume, the meters, and exactly when the sound is bit-perfect.
 
 ## Install
 
