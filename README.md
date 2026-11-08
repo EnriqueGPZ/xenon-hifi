@@ -9,7 +9,7 @@
   <br><sub>macOS 26 or later · Apple silicon and Intel · free and open source</sub>
 </p>
 
-![The XENON stack: equalizer, tube preamp, file player and CD player with VU meters](docs/images/stack.jpg)
+![XENON playing: the needles move, the tubes glow and the equalizer meters follow the music](docs/images/xenon-demo.gif)
 
 XENON is a native macOS app (Swift and SwiftUI) that plays physical CDs from a USB drive and high-resolution music files (FLAC, ALAC, WAV, AIFF, MP3). It shows them on a dot-matrix display, VU meters and a cover screen, and it can colour the sound with a tube stage and a 10-band equalizer.
 
@@ -25,6 +25,8 @@ It was made by someone who does not write code, by talking with an AI coding ass
 | **Graphic Equalizer EQ-10** | Ten bands with shelving ends, saved presets, the curve on its display, and peak meters with OVER lights that count clips the way studio meters do. |
 
 The units stack on top of each other in the order the sound flows through them, and they move together as one. All four come up when the app starts.
+
+![The XENON stack: equalizer, tube preamp, file player and CD player with VU meters](docs/images/stack.jpg)
 
 The **Help menu (⌘?)** opens a guide, in Spanish, to every unit, every button and shortcut, and how the sound is treated.
 

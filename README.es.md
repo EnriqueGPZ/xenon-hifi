@@ -9,7 +9,7 @@
   <br><sub>macOS 26 o posterior · chip Apple e Intel · gratis y de código abierto</sub>
 </p>
 
-![La torre XENON: ecualizador, previo a válvulas, reproductor de archivos y lector de CD con vúmetros](docs/images/stack.jpg)
+![XENON sonando: las agujas se mueven, las válvulas brillan y los medidores del ecualizador siguen la música](docs/images/xenon-demo.gif)
 
 XENON es una app nativa de macOS, escrita en Swift y SwiftUI, que:
 - Reproduce CD físicos desde un lector USB y archivos de alta resolución (FLAC, ALAC, WAV, AIFF y MP3).
@@ -28,6 +28,8 @@ La hizo alguien que no sabe programar, conversando con un asistente de programac
 | **Graphic Equalizer EQ-10** | Diez bandas con los extremos en estantería, ajustes guardados, la curva en pantalla y medidores de pico con luces OVER que cuentan los recortes como los de estudio. |
 
 Los aparatos se apilan en el orden en que los recorre el sonido y se mueven juntos. Al abrir la app salen los cuatro.
+
+![La torre XENON: ecualizador, previo a válvulas, reproductor de archivos y lector de CD con vúmetros](docs/images/stack.jpg)
 
 El **menú Ayuda (⌘?)** abre una guía de cada aparato, cada botón y atajo, y de cómo se trata el sonido.
 
