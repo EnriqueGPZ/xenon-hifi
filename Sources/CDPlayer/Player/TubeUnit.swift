@@ -3,12 +3,15 @@ import AVFoundation
 import CDPlayerKit
 import Synchronization
 
-/// The tube stage (CDPlayerKit/Tube.swift) as a link of the sound chain:
-/// an Audio Unit that lives inside the app, so AVAudioEngine can put it
-/// between the player and the equalizer.
+/// The tube preamp as a link of the sound chain: the tube stage
+/// (CDPlayerKit/Tube.swift), then the crossfeed (CDPlayerKit/Crossfeed.swift).
+/// An Audio Unit that lives inside the app, so AVAudioEngine can put it
+/// between the player and the equalizer. The crossfeed treats both channels
+/// alike in nothing but their difference, and the equalizer treats both
+/// alike, so crossfeed before the equalizer sounds the same as after it.
 ///
-/// The switch and the knob reach the sound thread through two atomics: the
-/// sound thread never waits for the app.
+/// The switches, the knob and the selector reach the sound thread through
+/// atomics: the sound thread never waits for the app.
 nonisolated final class TubeAudioUnit: AUAudioUnit, @unchecked Sendable {
     static let description = AudioComponentDescription(
         componentType: kAudioUnitType_Effect,
@@ -28,12 +31,15 @@ nonisolated final class TubeAudioUnit: AUAudioUnit, @unchecked Sendable {
 
     private let enabled = Atomic<Bool>(false)
     private let warmthBits = Atomic<UInt32>(Float(TubeSettings.defaultWarmth).bitPattern)
+    private let crossfeedOn = Atomic<Bool>(false)
+    private let crossfeedLevel = Atomic<Int>(CrossfeedLevel.medium.index)
     private var inputBus: AUAudioUnitBus!
     private var outputBus: AUAudioUnitBus!
     private var inputs: AUAudioUnitBusArray!
     private var outputs: AUAudioUnitBusArray!
     /// Made in allocateRenderResources, for the rate the chain runs at.
     private var stage: TubeStage?
+    private var crossfeed: Crossfeed?
     private var inputBuffer: AVAudioPCMBuffer?
 
     override init(componentDescription: AudioComponentDescription, options: AudioComponentInstantiationOptions = []) throws {
@@ -55,6 +61,11 @@ nonisolated final class TubeAudioUnit: AUAudioUnit, @unchecked Sendable {
         warmthBits.store(Float(settings.warmth).bitPattern, ordering: .relaxed)
     }
 
+    func set(_ settings: CrossfeedSettings) {
+        crossfeedOn.store(settings.enabled, ordering: .relaxed)
+        crossfeedLevel.store(settings.level.index, ordering: .relaxed)
+    }
+
     override func allocateRenderResources() throws {
         try super.allocateRenderResources()
         let format = inputBus.format
@@ -62,18 +73,20 @@ nonisolated final class TubeAudioUnit: AUAudioUnit, @unchecked Sendable {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(kAudioUnitErr_FormatNotSupported))
         }
         stage = TubeStage(sampleRate: format.sampleRate)
+        crossfeed = Crossfeed(sampleRate: format.sampleRate)
         inputBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: maximumFramesToRender)
     }
 
     override func deallocateRenderResources() {
         stage = nil
+        crossfeed = nil
         inputBuffer = nil
         super.deallocateRenderResources()
     }
 
     override var internalRenderBlock: AUInternalRenderBlock {
         return { [unowned self] _, timestamp, frameCount, _, outputData, _, pullInputBlock in
-            guard let pullInputBlock, let stage, let inputBuffer else { return kAudioUnitErr_NoConnection }
+            guard let pullInputBlock, let stage, let crossfeed, let inputBuffer else { return kAudioUnitErr_NoConnection }
             guard frameCount <= inputBuffer.frameCapacity else { return kAudioUnitErr_TooManyFramesToProcess }
             // Pull the sound from the player into our own buffer.
             let input = inputBuffer.mutableAudioBufferList
@@ -101,6 +114,9 @@ nonisolated final class TubeAudioUnit: AUAudioUnit, @unchecked Sendable {
             stage.process(left: left, right: right, frames: Int(frameCount),
                           on: self.enabled.load(ordering: .relaxed),
                           warmth: Float(bitPattern: self.warmthBits.load(ordering: .relaxed)))
+            crossfeed.process(left: left, right: right, frames: Int(frameCount),
+                              on: self.crossfeedOn.load(ordering: .relaxed),
+                              level: CrossfeedLevel(index: self.crossfeedLevel.load(ordering: .relaxed)))
             return noErr
         }
     }
@@ -109,9 +125,13 @@ nonisolated final class TubeAudioUnit: AUAudioUnit, @unchecked Sendable {
 extension TubeAudioUnit {
     /// The self-test: a second of a 1 kHz tone through the real chain link,
     /// rendered offline (nothing reaches the DAC). Off must give the tone
-    /// back as it went in; on must add a 2nd harmonic. Nil if the unit
-    /// would not load.
-    static func check(on: Bool) -> (difference: Float, second: Double)? {
+    /// back as it went in; tubes on must add a 2nd harmonic. With
+    /// `leftOnly`, the tone plays on the left alone, so crossfeed shows as
+    /// sound on the right. Returns the biggest change on either channel, the
+    /// 2nd harmonic on the left, and the right channel's tone against the
+    /// left input, both in dB. Nil if the unit would not load.
+    static func check(on: Bool, crossfeed: Bool = false, leftOnly: Bool = false)
+        -> (difference: Float, second: Double, right: Double)? {
         _ = register
         let rate = 44_100.0
         let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 2)!
@@ -120,7 +140,8 @@ extension TubeAudioUnit {
         tone.frameLength = frames
         for channel in 0..<2 {
             for n in 0..<Int(frames) {
-                tone.floatChannelData![channel][n] = 0.5 * Float(sin(2 * Double.pi * 1000 * Double(n) / rate))
+                let silent = leftOnly && channel == 1
+                tone.floatChannelData![channel][n] = silent ? 0 : 0.5 * Float(sin(2 * Double.pi * 1000 * Double(n) / rate))
             }
         }
         let engine = AVAudioEngine()
@@ -128,6 +149,7 @@ extension TubeAudioUnit {
         let node = AVAudioUnitEffect(audioComponentDescription: description)
         guard let unit = node.auAudioUnit as? TubeAudioUnit else { return nil }
         unit.set(TubeSettings(enabled: on, warmth: 1))
+        unit.set(CrossfeedSettings(enabled: crossfeed, level: .medium))
         engine.attach(player)
         engine.attach(node)
         engine.connect(player, to: node, format: format)
@@ -139,26 +161,34 @@ extension TubeAudioUnit {
         player.scheduleBuffer(tone)
         player.play()
         guard let out = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else { return nil }
-        var rendered: [Float] = []
-        while rendered.count < Int(frames) {
-            let count = min(engine.manualRenderingMaximumFrameCount, frames - AVAudioFrameCount(rendered.count))
+        var rendered: [[Float]] = [[], []]
+        while rendered[0].count < Int(frames) {
+            let count = min(engine.manualRenderingMaximumFrameCount, frames - AVAudioFrameCount(rendered[0].count))
             guard (try? engine.renderOffline(count, to: out)) == .success else { return nil }
-            rendered += UnsafeBufferPointer(start: out.floatChannelData![0], count: Int(out.frameLength))
+            for channel in 0..<2 {
+                rendered[channel] += UnsafeBufferPointer(start: out.floatChannelData![channel], count: Int(out.frameLength))
+            }
         }
         engine.stop()
-        let input = UnsafeBufferPointer(start: tone.floatChannelData![0], count: Int(frames))
-        let difference = zip(rendered, input).reduce(Float(0)) { max($0, abs($1.0 - $1.1)) }
-        // The 2nd harmonic against the tone, in the settled second half.
-        func level(_ hz: Double) -> Double {
+        var difference: Float = 0
+        for channel in 0..<2 {
+            let input = UnsafeBufferPointer(start: tone.floatChannelData![channel], count: Int(frames))
+            difference = zip(rendered[channel], input).reduce(difference) { max($0, abs($1.0 - $1.1)) }
+        }
+        // A tone's level in the settled second half of a channel.
+        func level(_ samples: [Float], _ hz: Double) -> Double {
             var re = 0.0, im = 0.0
-            let start = rendered.count / 2
-            for n in start..<rendered.count {
+            let start = samples.count / 2
+            for n in start..<samples.count {
                 let phase = 2 * Double.pi * hz * Double(n) / rate
-                re += Double(rendered[n]) * cos(phase)
-                im += Double(rendered[n]) * sin(phase)
+                re += Double(samples[n]) * cos(phase)
+                im += Double(samples[n]) * sin(phase)
             }
             return (re * re + im * im).squareRoot()
         }
-        return (difference, 20 * log10(max(level(2000), 1e-12) / level(1000)))
+        let reference = level(Array(UnsafeBufferPointer(start: tone.floatChannelData![0], count: Int(frames))), 1000)
+        return (difference,
+                20 * log10(max(level(rendered[0], 2000), 1e-12) / level(rendered[0], 1000)),
+                20 * log10(max(level(rendered[1], 1000), 1e-12) / reference))
     }
 }

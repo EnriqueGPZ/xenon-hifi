@@ -21,10 +21,12 @@ It was made by someone who does not write code, by talking with an AI coding ass
 |---|---|
 | **Compact Disc Player CDP-1** | Plays the CD in a USB drive. It recognises the disc by its fingerprint (MusicBrainz disc ID) and fetches the album, artist and song titles once. It reads the disc ahead in big pieces (anti-skip memory), so a slow USB drive never cuts the music. It shows elapsed and remaining time, spectrum bars and analog VU meters. It also has favourites per disc, shuffle, repeat, and a balance knob. |
 | **Music File Player MF-1** | Plays the music folder or disk you choose: FLAC, ALAC, WAV, AIFF and MP3. The DAC switches to each song's own sample rate by itself, so a 24-bit/176.4 kHz file reaches it untouched. It has a colour screen for the cover, album, song and folder lists, a selector knob with detents, ★ favourites, and it remembers the song and second where you stopped. |
-| **Tube Preamplifier TP-4** | Adds the warmth of a hi-fi triode stage, mostly 2nd harmonic, without changing the loudness. A WARMTH knob sets how much. When off, the sound passes bit for bit. Four photo-real tubes glow with each channel's music. |
+| **Tube Preamplifier TP-4** | Adds the warmth of a hi-fi triode stage, mostly 2nd harmonic, without changing the loudness. A WARMTH knob sets how much. When off, the sound passes bit for bit. Four photo-real tubes glow with each channel's music. It also has **CROSSFEED** for headphones, with three classic levels: each ear gets a little of the other channel, as with speakers, while the centre stays untouched. |
 | **Graphic Equalizer EQ-10** | Ten bands with shelving ends, saved presets, the curve on its display, and peak meters with OVER lights that count clips the way studio meters do. |
 
-The units stack on top of each other in the order the sound flows through them, and they move together as one.
+The units stack on top of each other in the order the sound flows through them, and they move together as one. All four come up when the app starts.
+
+The **Help menu (⌘?)** opens a guide, in Spanish, to every unit, every button and shortcut, and how the sound is treated.
 
 ![Spectrum bars](docs/images/stack-spectrum.jpg)
 
@@ -39,12 +41,14 @@ The units stack on top of each other in the order the sound flows through them, 
 
 ```
 CD (USB drive) ─┐
-                ├─► player ─► tubes ─► equalizer ─► volume ─► your DAC
-Music files ────┘   (balance)  (TP-4)    (EQ-10)
+                ├─► player ─► tubes + crossfeed ─► equalizer ─► volume ─► your DAC
+Music files ────┘   (balance)        (TP-4)           (EQ-10)
 ```
 
-- **Bit-perfect with the tubes off, the EQ flat and the volume at maximum.** The chain runs at the music's own sample rate, and the app sets the DAC to that rate before it plays. Nothing is resampled on the way.
+- **Bit-perfect with the tubes and crossfeed off, the EQ flat and the volume at maximum.** The chain runs at the music's own sample rate, and the app sets the DAC to that rate before it plays. Nothing is resampled on the way.
 - **The tube stage** (`Sources/CDPlayerKit/Tube.swift`) uses a biased `tanh` curve, the classic model of a triode near its working point. It is scaled so quiet sound keeps exactly its level and only the colour changes. It runs 4× oversampled at CD rates, so high notes do not fold back as false tones. Switching it on or off fades over 30 ms.
+- **Crossfeed** (`Sources/CDPlayerKit/Crossfeed.swift`) feeds each channel the lowpassed *difference* of the other, so the centre comes out bit-identical and what crosses arrives about 0.23 ms late, as around a head.
+- **The DAC, exclusively (optional).** In Settings, XENON can hold the DAC while music plays, so no other Mac sound mixes in or changes its rate.
 - **Meters show what you hear.** The bars, the needles, the tube glow and the OVER lights all listen after the equalizer.
 
 The tests measure all of this: the harmonics, the level, the folding and the clicks. They are in `Tests/CDPlayerKitTests/`.
@@ -86,6 +90,9 @@ The repository includes `CLAUDE.md` and `AGENTS.md` with everything an AI coding
 - **More units:** the *Reproducción* and *Archivos* menus open the file player (⌥⌘M), the tube preamp (⌥⌘V) and the equalizer (⌥⌘E).
 - **File player:** press MÚSICA and choose the disk or folder with your music. LISTA goes through cover, albums, songs and folders, and the SELECCIÓN knob moves through them.
 - **Tubes:** V turns them on or off. ⌥⌘↑ and ⌥⌘↓ change the warmth.
+- **Crossfeed:** C turns it on or off, ⇧C goes to the next level (SUAVE, MEDIO, FUERTE). For headphones only.
+- **File player lists:** ↑ and ↓ move through albums and songs after you click the file player.
+- **Help:** ⌘? opens the guide.
 
 The interface is in Spanish, like the panel of the gear it imitates.
 

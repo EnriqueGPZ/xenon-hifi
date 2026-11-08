@@ -10,11 +10,12 @@ Read `README.md` for what the app does and `docs/DESIGN-DECISIONS.md` before cha
 - `Sources/CDPlayer/App.swift`: windows, menus, keyboard shortcuts, the store location.
 - `Sources/CDPlayer/Models.swift`: app state; builds the two playbacks, the EQ and the tube model.
 - `Sources/CDPlayer/Player/`: sound and hardware.
-  - `Playback.swift`: one AVAudioEngine per unit, chain `source → tube → EQ → mixer`, meter taps after the EQ.
+  - `Playback.swift`: one AVAudioEngine per unit, chain `source → tube + crossfeed → EQ → mixer`, meter taps after the EQ.
   - `CDDrive.swift`: finding the audio CD.
-  - `OutputDevice.swift`: the DAC sample rate.
-  - `TubeUnit.swift`: the tube stage as an in-process `AUAudioUnit`.
+  - `OutputDevice.swift`: the DAC sample rate, and holding the DAC exclusively (hog mode) while music plays.
+  - `TubeUnit.swift`: the tube stage and the crossfeed as an in-process `AUAudioUnit`.
   - `*Model.swift`: the state behind each unit.
+- `Sources/CDPlayer/Help/`: the in-app guide (Ayuda, ⌘?).
 - `Sources/CDPlayer/UI/`: the units' looks.
   - `Tokens.swift`: every size, colour and duration of the units.
   - `Grid.swift`: the 4 pt spacing.
@@ -23,7 +24,7 @@ Read `README.md` for what the app does and `docs/DESIGN-DECISIONS.md` before cha
 - `Sources/CDPlayerKit/`: logic that can be tested without the app.
   - Disc TOC and disc ID, MusicBrainz parsing.
   - The track readers (anti-skip memory), the music library.
-  - Spectrum, VU, balance, EQ curves.
+  - Spectrum, VU, balance, EQ curves, the tube stage, the crossfeed.
   - `Tube.swift`: the tube DSP.
 - `Tests/CDPlayerKitTests/`: Swift Testing tests, including sound measurements (harmonics, level, aliasing, clicks).
 - `Resources/Tubes/`: the tube pictures (cold + glow layers), made by `tools/tube_layers.py`.
@@ -58,9 +59,10 @@ Read `README.md` for what the app does and `docs/DESIGN-DECISIONS.md` before cha
 - **Window chrome stays system:** menus, Settings and sheets. The units themselves have no title bar.
 - **Spacing:** `Space` in `UI/Grid.swift`, on a 4 pt grid.
 - **Shortcuts:** every action has a menu item and a keyboard shortcut.
+- **The in-app guide** (Ayuda, ⌘?) lives in `Sources/CDPlayer/Help/HelpContent.swift`. A new or changed button, knob, shortcut, setting or sound behaviour updates it in the same change; check it with `APP_SNAPSHOT_PAGES=help tools/snap.sh`.
 - **Language:** panel labels are Spanish, in capitals, like the gear the app imitates.
 - **Sound changes never click:** ramps and crossfades, as the EQ and tube stage do.
-- **Bit-perfect when off:** with the tubes off and the EQ flat, the sound must pass bit for bit, with tests that prove it.
+- **Bit-perfect when off:** with the tubes and crossfeed off and the EQ flat, the sound must pass bit for bit, with tests that prove it.
 - **No third-party audio code:** only Apple's frameworks.
 
 ## Working style

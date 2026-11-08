@@ -10,6 +10,7 @@ struct FilePlayerView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var dragging = false
+    @State private var arrowKeys: Any?
 
     private var files: FilePlayerModel { model.filePlayer }
 
@@ -25,9 +26,42 @@ struct FilePlayerView: View {
         }
         .padding(Space.lg)
         .noInitialFocus()
-        .onAppear { DispatchQueue.main.async { UnitStack.arrange() } }
-        .onDisappear { UnitStack.unitClosed() }
+        .onAppear {
+            DispatchQueue.main.async { UnitStack.arrange() }
+            arrowKeys = installArrowKeys()
+        }
+        .onDisappear {
+            UnitStack.unitClosed()
+            if let arrowKeys { NSEvent.removeMonitor(arrowKeys) }
+            arrowKeys = nil
+        }
     }
+
+    /// ↑ and ↓ move through the list like one click of SELECCIÓN, while this
+    /// unit was the last one clicked. The units hang from the CD player's
+    /// window and never become the key window, so the keys arrive at the
+    /// player's: what counts is where the last click landed.
+    private func installArrowKeys() -> Any? {
+        var lastClickHere = false
+        return NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown]) { [files] event in
+            if event.type == .leftMouseDown {
+                lastClickHere = event.window?.identifier?.rawValue.hasPrefix(FilePlayerView.windowID) == true
+                return event
+            }
+            guard lastClickHere,
+                  event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty
+            else { return event }
+            switch event.keyCode {
+            case Self.upKey: files.moveHighlight(by: -1)
+            case Self.downKey: files.moveHighlight(by: 1)
+            default: return event
+            }
+            return nil
+        }
+    }
+
+    private static let upKey: UInt16 = 126
+    private static let downKey: UInt16 = 125
 
     private var panel: some View {
         HStack(alignment: .top, spacing: Space.xxl) {

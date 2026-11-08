@@ -2,14 +2,14 @@
 
 *[Read in English](SOUND.md)*
 
-Esta página explica paso a paso qué hace XENON con el sonido y cómo se comprueba cada cosa. En corto: **con las válvulas apagadas, el ecualizador plano y el volumen al máximo, la música llega a tu DAC exactamente como está en el disco o en el archivo, a su propia frecuencia.** Todo lo que añade la app es opcional, y las pruebas lo miden.
+Esta página explica paso a paso qué hace XENON con el sonido y cómo se comprueba cada cosa. En corto: **con las válvulas y el crossfeed apagados, el ecualizador plano y el volumen al máximo, la música llega a tu DAC exactamente como está en el disco o en el archivo, a su propia frecuencia.** Todo lo que añade la app es opcional, y las pruebas lo miden.
 
 ## El camino
 
 ```
 CD (.aiff de macOS) ───┐                                                         ┌─► medidores
-                       ├─► lector ─► reproductor ─► válvulas ─► ecualizador ─► mezclador (volumen) ─► Core Audio ─► DAC
-FLAC/ALAC/WAV/AIFF/MP3 ┘  (antisaltos)  (balance)     (TP-4)      (EQ-10)
+                       ├─► lector ─► reproductor ─► válvulas + crossfeed ─► ecualizador ─► mezclador (volumen) ─► Core Audio ─► DAC
+FLAC/ALAC/WAV/AIFF/MP3 ┘  (antisaltos)  (balance)          (TP-4)             (EQ-10)
 ```
 
 Por dentro todo va en **coma flotante de 32 bits**, el formato propio del audio de macOS. Un número de 32 bits en coma flotante guarda exactamente cualquier muestra de 16 o 24 bits, así que llevar la música así no pierde nada.
@@ -27,6 +27,8 @@ Por dentro todo va en **coma flotante de 32 bits**, el formato propio del audio 
 Antes de cada canción, la app pone tu DAC a la frecuencia de esa canción (`Player/OutputDevice.swift`): 44,1 kHz para un CD, 96 kHz para un archivo de 96 kHz, etc. Sin esto, macOS convertiría todo en silencio a la frecuencia que tuviera puesta el DAC. Entre canciones de frecuencia distinta hay un silencio breve mientras el DAC cambia; entre canciones de la misma frecuencia, no hay hueco.
 
 Si el DAC cambia de frecuencia, se desenchufa o vuelve, macOS reinicia el motor de audio y tira lo que tenía en cola. XENON vuelve a leer la música desde el segundo exacto donde iba.
+
+**El DAC en exclusiva (opcional).** Con *Ajustes ▸ Sonido ▸ Usar el DAC en exclusiva*, XENON se queda el DAC para él solo mientras suena la música (el *hog mode* de Core Audio, `ExclusiveOutput` en `Player/OutputDevice.swift`). Ningún aviso, vídeo u otro programa se mezcla con la música ni le cambia la frecuencia. macOS manda los demás sonidos a otra salida (los altavoces del Mac) hasta que pausas o paras; entonces el DAC queda libre, y si la app se cierra, macOS lo libera solo. Al coger el DAC, macOS cambia la salida predeterminada del sistema y AVAudioEngine la sigue un momento después, así que XENON espera unos 0,3 s y entonces fija su motor al DAC: es la pequeña pausa al pulsar Reproducir. Viene apagado, y se ha probado con un DAC USB; usa una función estándar de macOS, así que otros DAC deberían comportarse igual.
 
 ## 3. Balance
 
@@ -59,6 +61,21 @@ Lo que miden las pruebas (`Tests/CDPlayerKitTests/TubeTests.swift`):
 
 Con un álbum real de 24 bits y 176,4 kHz y CALIDEZ al 100 %, el nivel medio cambió unos 0,01 dB.
 
+### Crossfeed (TP-4), para auriculares
+
+Con altavoces, cada oído oye los dos: el altavoz izquierdo llega también al oído derecho, rodeando la cabeza, unas décimas de milisegundo más tarde, más flojo y sin agudos. Con auriculares cada oído oye solo su canal, así que la música suena dentro de la cabeza, y lo que va mezclado a un solo lado (muy típico en los discos estéreo de los 60) suena pegado a una oreja. CROSSFEED pasa a cada oído un poco del otro canal, como haría la cabeza (`CDPlayerKit/Crossfeed.swift`):
+
+```
+izquierdo = L + g · (graves(R) − graves(L))
+derecho   = R + g · (graves(L) − graves(R))
+```
+
+- `graves` es un filtro suave (6 dB por octava a 650–700 Hz): los agudos apenas cruzan, y su fase retrasa lo que cruza `1/(2π·corte)`, unos **0,23 ms** en los graves, parecido a lo que tarda el sonido en rodear la cabeza. No hace falta un retardo aparte.
+- Solo cruza la **diferencia** entre canales, así que lo que es igual en los dos (una voz en el centro) sale **idéntico bit a bit**: ni más fuerte ni con más graves. En los graves, un sonido mezclado del todo a un lado llega al otro oído `feed` dB más bajo que al suyo: `g = a/(1+a)` con `a = 10^(−feed/20)`.
+- Tres niveles clásicos: **SUAVE** (Jan Meier, 650 Hz, 9,5 dB), **MEDIO** (Chu Moy, 700 Hz, 6 dB), **FUERTE** (Bauer, 700 Hz, 4,5 dB). Viene apagado.
+- Va en el eslabón del previo, tras las válvulas. El ecualizador trata igual los dos canales, así que suena igual que si fuera el último. Apagado no toca nada; encender, apagar o cambiar de nivel hace un fundido de 30 ms.
+- Medido en las pruebas: apagado es idéntico, el centro es idéntico, el otro oído queda `feed` dB más bajo (±0,3 dB) en los graves, un tono de 10 kHz cruza más de 20 dB más bajo, el retraso es de 0,23 ms, encenderlo con música no da chasquido y funciona a 192 kHz.
+
 ## 5. El ecualizador (EQ-10)
 
 - **Diez bandas separadas una octava** (de 31 Hz a 16 kHz, las frecuencias ISO), ±12 dB en pasos de 0,5 dB, más un control NIVEL de 0 a −12 dB para dejar sitio cuando se suben bandas.
@@ -81,7 +98,7 @@ Las barras, las agujas, el brillo de las válvulas y las luces OVER escuchan **d
 
 ## Qué es bit a bit, exactamente
 
-Con **las válvulas apagadas, el ecualizador plano, el balance en el centro y el volumen al máximo**, cada etapa de la app deja pasar el sonido sin tocarlo, y las pruebas lo demuestran una por una. La música sale de XENON tal como entró, a su propia frecuencia. Desde ahí, Core Audio se la entrega a tu DAC en el formato del propio DAC.
+Con **las válvulas y el crossfeed apagados, el ecualizador plano, el balance en el centro y el volumen al máximo**, cada etapa de la app deja pasar el sonido sin tocarlo, y las pruebas lo demuestran una por una. La música sale de XENON tal como entró, a su propia frecuencia. Desde ahí, Core Audio se la entrega a tu DAC en el formato del propio DAC.
 
 Límite conocido: los WAV/AIFF de 32 bits *enteros* (rarísimos) no salen idénticos, porque el motor trabaja en coma flotante de 32 bits.
 

@@ -24,10 +24,12 @@ La hizo alguien que no sabe programar, conversando con un asistente de programac
 |---|---|
 | **Compact Disc Player CDP-1** | Reproduce el CD del lector USB. Reconoce el disco por su huella (MusicBrainz) y busca una sola vez el álbum, el artista y los títulos. Lee el disco por delante en trozos grandes (memoria antisaltos), así que un lector USB lento no corta la música. Pantallas de tiempo transcurrido, tiempo restante, barras de espectro y vúmetros. Favoritas por disco, aleatorio, repetir y perilla de balance. |
 | **Music File Player MF-1** | Reproduce la carpeta o el disco de música que elijas. El DAC cambia solo a la frecuencia de cada canción, así que un archivo de 24 bits y 176,4 kHz le llega intacto. Pantalla en color para la portada, listas de álbumes, canciones y carpetas, rueda con muescas, favoritas ★, y recuerda la canción y el segundo donde lo dejaste. |
-| **Tube Preamplifier TP-4** | Añade la calidez de una etapa de triodo de hi-fi, sobre todo 2º armónico, sin cambiar el volumen. La perilla CALIDEZ decide cuánto. Apagado, el sonido pasa bit a bit. Cuatro válvulas fotorrealistas brillan con la música de cada canal. |
+| **Tube Preamplifier TP-4** | Añade la calidez de una etapa de triodo de hi-fi, sobre todo 2º armónico, sin cambiar el volumen. La perilla CALIDEZ decide cuánto. Apagado, el sonido pasa bit a bit. Cuatro válvulas fotorrealistas brillan con la música de cada canal. También tiene **CROSSFEED** para auriculares, con tres niveles clásicos: cada oído recibe un poco del otro canal, como con altavoces, y el centro queda intacto. |
 | **Graphic Equalizer EQ-10** | Diez bandas con los extremos en estantería, ajustes guardados, la curva en pantalla y medidores de pico con luces OVER que cuentan los recortes como los de estudio. |
 
-Los aparatos se apilan en el orden en que los recorre el sonido y se mueven juntos.
+Los aparatos se apilan en el orden en que los recorre el sonido y se mueven juntos. Al abrir la app salen los cuatro.
+
+El **menú Ayuda (⌘?)** abre una guía de cada aparato, cada botón y atajo, y de cómo se trata el sonido.
 
 <p align="center">
   <img src="docs/images/tube-preamp.jpg" alt="El previo a válvulas" width="100%"><br>
@@ -38,12 +40,14 @@ Los aparatos se apilan en el orden en que los recorre el sonido y se mueven junt
 
 ```
 CD (lector USB) ─┐
-                 ├─► reproductor ─► válvulas ─► ecualizador ─► volumen ─► tu DAC
-Archivos ────────┘    (balance)      (TP-4)       (EQ-10)
+                 ├─► reproductor ─► válvulas + crossfeed ─► ecualizador ─► volumen ─► tu DAC
+Archivos ────────┘    (balance)            (TP-4)             (EQ-10)
 ```
 
-- **Bit a bit con las válvulas apagadas, el ecualizador plano y el volumen al máximo.** La cadena trabaja a la frecuencia de la propia música, y la app pone el DAC a esa frecuencia antes de sonar. Nada se convierte por el camino.
+- **Bit a bit con las válvulas y el crossfeed apagados, el ecualizador plano y el volumen al máximo.** La cadena trabaja a la frecuencia de la propia música, y la app pone el DAC a esa frecuencia antes de sonar. Nada se convierte por el camino.
 - **Las válvulas** (`Sources/CDPlayerKit/Tube.swift`) usan una curva `tanh` con sesgo, el modelo clásico de un triodo en su punto de trabajo. Está ajustada para que el sonido flojo mantenga su nivel exacto y solo cambie el color. A frecuencias de CD trabaja a 4 veces la frecuencia, para que las notas agudas no generen tonos falsos. Al encender o apagar hace un fundido de 30 ms.
+- **El crossfeed** (`Sources/CDPlayerKit/Crossfeed.swift`) pasa a cada canal la *diferencia* del otro, solo en graves y medios, así que el centro sale idéntico bit a bit y lo que cruza llega unos 0,23 ms tarde, como alrededor de una cabeza.
+- **El DAC en exclusiva (opcional).** En Ajustes, XENON puede quedarse el DAC mientras suena, para que ningún otro sonido del Mac se mezcle ni le cambie la frecuencia.
 - **Los medidores enseñan lo que oyes.** Las barras, las agujas, el brillo de las válvulas y las luces OVER escuchan después del ecualizador.
 
 Las pruebas miden todo esto (armónicos, nivel, tonos falsos y chasquidos) y están en `Tests/CDPlayerKitTests/`.
@@ -85,6 +89,9 @@ El repositorio trae `CLAUDE.md` y `AGENTS.md` con todo lo que necesita un asiste
 - **Más aparatos:** desde los menús *Reproducción* y *Archivos* se abren el reproductor de archivos (⌥⌘M), el previo a válvulas (⌥⌘V) y el ecualizador (⌥⌘E).
 - **Reproductor de archivos:** pulsa MÚSICA y elige el disco o la carpeta. LISTA recorre portada, álbumes, canciones y carpetas, y la rueda SELECCIÓN se mueve por ellas.
 - **Válvulas:** V las enciende o apaga, y ⌥⌘↑ y ⌥⌘↓ cambian la calidez.
+- **Crossfeed:** C lo enciende o apaga, ⇧C pasa al siguiente nivel (SUAVE, MEDIO, FUERTE). Solo para auriculares.
+- **Listas del reproductor de archivos:** ↑ y ↓ recorren álbumes y canciones después de pulsar en el reproductor de archivos.
+- **Ayuda:** ⌘? abre la guía.
 
 ## Comprobar cambios
 

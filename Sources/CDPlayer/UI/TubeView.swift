@@ -96,6 +96,7 @@ struct TubeView: View {
                     EngravedLabel(text: "CALIDEZ")
                 }
             }
+            crossfeedRow
             Spacer(minLength: 0)
             Text("TUBE PREAMPLIFIER  TP-4")
                 .font(PlayerTokens.modelFont)
@@ -103,6 +104,33 @@ struct TubeView: View {
                 .foregroundStyle(PlayerTokens.engravedDim)
         }
         .frame(width: 288)
+    }
+
+    /// CROSSFEED for headphones, and its three levels: the light of the
+    /// chosen level stays lit, so the selector's position shows even when off.
+    private var crossfeedRow: some View {
+        HStack(alignment: .bottom, spacing: Space.xl) {
+            LabeledButton(label: "CROSSFEED", active: tube.crossfeed.enabled,
+                          help: "Crossfeed para auriculares: mezcla un poco de cada canal en el otro, como oyes unos altavoces (C)") {
+                tube.toggleCrossfeed()
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityValue(tube.crossfeed.enabled ? "encendido" : "apagado")
+            HStack(alignment: .bottom, spacing: Space.md) {
+                ForEach(CrossfeedLevel.allCases, id: \.self) { level in
+                    LabeledButton(label: level.label, active: tube.crossfeed.level == level,
+                                  help: "Crossfeed \(level.label.lowercased()): \(Self.formatted(level.feed)) dB, \(Int(level.cutoff)) Hz (Mayúsculas C cambia de nivel)") {
+                        tube.setCrossfeedLevel(level)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityValue(tube.crossfeed.level == level ? "elegido" : "")
+                }
+            }
+        }
+    }
+
+    private static func formatted(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(0...1)).locale(Locale(identifier: "es_ES")))
     }
 
     static let windowID = "tubes"

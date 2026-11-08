@@ -56,6 +56,11 @@ Each decision also notes **what was discarded and why**, so nobody (human or AI)
 - **At launch, the file player returns to the song and second where it stopped, paused.** It never starts playing by itself.
 - **XENON chrome badge with a moving glint** (every 25 s and following the mouse). Discarded: an engraved plate, gold, a lit emblem.
 - **Signing with a stable certificate.** With ad-hoc signing, macOS sees a new app every build and asks again for permission to read the CD.
+- **Optional exclusive DAC (hog mode), held only while music plays.** No other sound mixes in or changes the rate. The engine is pinned to the DAC about 0.3 s after taking it, because macOS moves the default output and the engine follows it. Discarded: always on (the rest of the Mac loses the DAC) and holding it while paused.
+- **On quit while playing: an 80 ms fade, then the reader, then the player, then the engine.** Dying with sound running made the DAC repeat its last milliseconds (a beep); stopping the player before the reader deadlocked.
+- **All four units open at launch; ↑/↓ follow the last unit clicked.** The units are child windows that never become key. Discarded: remembering which units were open.
+- **An in-app guide (Help ▸ ⌘?) kept in step with every control.** Discarded: videos, an English version, an Apple Help Book (more work to keep up to date).
+- **CROSSFEED on the tube preamp, three classic levels, crossing only the channels' difference** so the centre stays bit-identical. Discarded: a fifth "headphone amp" unit, a free amount knob, detecting headphones (the Mac only sees the DAC), binaural/HRTF, and bs2b (no third-party audio code).
 
 ## Out of scope (for now)
 

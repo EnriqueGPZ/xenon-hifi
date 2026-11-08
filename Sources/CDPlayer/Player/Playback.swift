@@ -1,6 +1,8 @@
 import Accelerate
+import AppKit
 import AVFoundation
 import CDPlayerKit
+import CoreAudio
 
 /// Plays one track at a time, like a CD player with anti-skip memory: a
 /// reader in the background takes the CD a couple of seconds at a time and
@@ -10,7 +12,7 @@ import CDPlayerKit
 /// and snapshots) it runs a silent clock, so the rest of the app behaves the
 /// same either way.
 ///
-/// The sound runs: reader → player node (balance) → tubes → equalizer →
+/// The sound runs: reader → player node (balance) → tubes and crossfeed → equalizer →
 /// mixer (volume) → the Mac's output (the DAC). The bars, the meters and the
 /// clip lights listen right after the equalizer, so they show what you hear.
 ///
@@ -47,6 +49,12 @@ final class Playback {
         didSet { tubeUnit?.set(tube) }
     }
 
+    /// The preamp's CROSSFEED switch and selector (CDPlayerKit/Crossfeed.swift),
+    /// in the same link as the tubes. Off, untouched; switching glides.
+    var crossfeed: CrossfeedSettings = .off {
+        didSet { tubeUnit?.set(crossfeed) }
+    }
+
     /// The sample rate the chain runs at now.
     var sampleRate: Double { format.sampleRate }
 
@@ -72,10 +80,14 @@ final class Playback {
     /// The track that took over without a gap, until the app asks for it.
     private var handedOver: URL?
     /// The current track played to its end with nothing behind it.
-    private var currentEnded = false
+    private var currentEnded = false { didSet { updateExclusive() } }
     /// The disc failed in the middle: the next play reads again from heldTime.
     private var needsRestart = false
-    private var isPlaying = false
+    private var isPlaying = false { didSet { updateExclusive() } }
+    /// The engine was fixed to a DAC once (routeOutput); nil while it follows the Mac.
+    private var pinned: AudioDeviceID?
+    /// Play was pressed and the DAC taken; the sound starts in a moment.
+    private var waitingForDAC = false { didSet { updateExclusive() } }
     private var heldTime: TimeInterval = 0
     private var silentLength: TimeInterval = 0
     private var silentPosition: TimeInterval = 0
@@ -99,6 +111,12 @@ final class Playback {
         }
         feeder.onReadError = { [weak self] segment, generation, time in
             Task { @MainActor in self?.readFailed(segment, generation: generation, at: time) }
+        }
+        // Quitting while it sounds: fade and stop first. Cut off mid-sound,
+        // the DAC repeats its last few milliseconds, heard as a beep.
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil,
+                                               queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.silenceForQuit() }
         }
         // Headphones or the DAC unplugged and back: pick the sound up again.
         NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine,
@@ -205,6 +223,30 @@ final class Playback {
         }
         if needsRestart { restart(at: heldTime, playing: false) }
         if currentEnded { seek(to: 0) }
+        // The DAC for this app alone. macOS then moves the Mac's default
+        // output to another device, and the engine follows that move a moment
+        // later; pinned before the move lands, it ends up on the speakers
+        // (measured). So the sound starts once the move is done.
+        if matchesDAC, ExclusiveOutput.shared.needsHold() {
+            engine.stop()
+            ExclusiveOutput.shared.hold()
+            restart(at: heldTime, playing: false)
+            waitingForDAC = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.defaultMoveDelay) { [self] in
+                guard waitingForDAC else { return }
+                waitingForDAC = false
+                if !startSound() { onSoundError?() }
+            }
+            return true
+        }
+        return startSound()
+    }
+
+    /// How long macOS takes to move the default output off a DAC just taken.
+    private static let defaultMoveDelay: TimeInterval = 0.3
+
+    private func startSound() -> Bool {
+        if routeOutput() { restart(at: heldTime, playing: false) }
         // The DAC at the track's rate, so nothing on the way converts it.
         if matchesDAC, OutputDevice.sampleRate != format.sampleRate {
             engine.stop()
@@ -224,6 +266,7 @@ final class Playback {
             silentStarted = nil
             return
         }
+        waitingForDAC = false
         heldTime = currentTime
         feeder.play(false)
         node.pause()
@@ -259,6 +302,7 @@ final class Playback {
     // MARK: - Private
 
     private func reset() {
+        waitingForDAC = false
         restartFeeding()
         current = nil
         isPlaying = false
@@ -324,8 +368,58 @@ final class Playback {
         onFinish?()
     }
 
+    /// Brings the sound down to nothing over a few hundredths of a second,
+    /// then stops the engine and gives the DAC back.
+    private func silenceForQuit() {
+        waitingForDAC = false
+        if engine.isRunning, isPlaying {
+            let start = engine.mainMixerNode.outputVolume
+            for step in stride(from: Self.quitFadeSteps - 1, through: 0, by: -1) {
+                engine.mainMixerNode.outputVolume = start * Float(step) / Float(Self.quitFadeSteps)
+                Thread.sleep(forTimeInterval: Self.quitFade / Double(Self.quitFadeSteps))
+            }
+        }
+        // The reader first, as everywhere else: node.stop() runs the played
+        // callbacks, which wait for the reader's lock while the reader waits
+        // for the engine inside scheduleBuffer (it hung on quit).
+        generation = feeder.restart()
+        node.stop()
+        engine.stop()
+        ExclusiveOutput.shared.releaseHeld()
+    }
+
+    private static let quitFade: TimeInterval = 0.08
+    private static let quitFadeSteps = 16
+
     /// Tests and snapshots never touch the DAC the listener uses.
     private var matchesDAC: Bool { !Store.isOverridden }
+    /// Holding the DAC makes macOS move the Mac's default output elsewhere
+    /// (the speakers), and the engine would follow it there. So the engine is
+    /// pinned to the held DAC; once pinned, to whatever the output is at each
+    /// play. Compared with where the engine really is: it can move on its own.
+    /// Returns whether the engine stopped to change output.
+    @discardableResult
+    private func routeOutput() -> Bool {
+        guard matchesDAC, ExclusiveOutput.shared.heldDevice != nil || pinned != nil,
+              let target = OutputDevice.device, let unit = engine.outputNode.audioUnit else { return false }
+        var now = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        AudioUnitGetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &now, &size)
+        guard now != target else { return false }
+        engine.stop()
+        var device = target
+        let status = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                                          &device, UInt32(MemoryLayout<AudioDeviceID>.size))
+        if status == noErr { pinned = target }
+        return true
+    }
+
+    /// Holds the DAC only while sound really plays (ExclusiveOutput).
+    private func updateExclusive() {
+        guard matchesDAC else { return }
+        ExclusiveOutput.shared.setPlaying(self, (isPlaying || waitingForDAC) && !currentEnded)
+    }
+
 
     /// Runs the chain at another sample rate. Nothing plays (load reset it).
     private func change(to rate: Double) {
@@ -385,6 +479,15 @@ final class Playback {
             return
         }
         let time = currentTime
+        // Another DAC plugged in, or the same one back: take it again, the
+        // same way Play does.
+        if matchesDAC, ExclusiveOutput.shared.needsHold() {
+            heldTime = time
+            isPlaying = false
+            if !play() { onSoundError?() }
+            return
+        }
+        routeOutput()
         // Back to this music's own rate.
         if matchesDAC, OutputDevice.sampleRate != format.sampleRate {
             engine.stop()

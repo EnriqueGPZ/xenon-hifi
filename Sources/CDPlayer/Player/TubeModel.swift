@@ -1,8 +1,9 @@
 import CDPlayerKit
 import Foundation
 
-/// The tube preamp unit: its VÁLVULAS switch, the CALIDEZ knob, and the
-/// glow of its four tubes. The sound lives in CDPlayerKit/Tube.swift.
+/// The tube preamp unit: its VÁLVULAS switch, the CALIDEZ knob, the glow of
+/// its four tubes, and the CROSSFEED switch and selector. The sound lives in
+/// CDPlayerKit/Tube.swift and CDPlayerKit/Crossfeed.swift.
 @Observable
 final class TubeModel {
     private(set) var settings: TubeSettings {
@@ -11,10 +12,18 @@ final class TubeModel {
             save()
         }
     }
+    /// CROSSFEED, for headphones. Saved on its own, apart from the tubes.
+    private(set) var crossfeed: CrossfeedSettings {
+        didSet {
+            sendCrossfeed(crossfeed)
+            saveCrossfeed()
+        }
+    }
     /// How bright each pair of tubes is, 0...1: left channel, right channel.
     private(set) var glow: [Double] = [0, 0]
 
     private let send: (TubeSettings) -> Void
+    private let sendCrossfeed: (CrossfeedSettings) -> Void
     private let loudness: () -> [Float]?
     private var timer: Timer?
     private var watchers = 0
@@ -23,9 +32,12 @@ final class TubeModel {
     /// Snapshots: a fixed glow, as if a song played.
     private var demo: [Double]?
     private static let settingsKey = "tube.settings"
+    private static let crossfeedKey = "crossfeed.settings"
 
-    init(send: @escaping (TubeSettings) -> Void, loudness: @escaping () -> [Float]?) {
+    init(send: @escaping (TubeSettings) -> Void, sendCrossfeed: @escaping (CrossfeedSettings) -> Void,
+         loudness: @escaping () -> [Float]?) {
         self.send = send
+        self.sendCrossfeed = sendCrossfeed
         self.loudness = loudness
         // Tests and snapshots start off and never touch what the listener saved.
         if !Store.isOverridden, let data = UserDefaults.standard.data(forKey: Self.settingsKey),
@@ -34,7 +46,14 @@ final class TubeModel {
         } else {
             settings = .off
         }
+        if !Store.isOverridden, let data = UserDefaults.standard.data(forKey: Self.crossfeedKey),
+           let saved = try? JSONDecoder().decode(CrossfeedSettings.self, from: data) {
+            crossfeed = saved
+        } else {
+            crossfeed = .off
+        }
         send(settings)
+        sendCrossfeed(crossfeed)
     }
 
     var warmthPercent: Int { Int((settings.warmth * 100).rounded()) }
@@ -55,6 +74,19 @@ final class TubeModel {
 
     func resetWarmth() {
         setWarmth(TubeSettings.defaultWarmth)
+    }
+
+    func toggleCrossfeed() {
+        crossfeed.enabled.toggle()
+    }
+
+    func setCrossfeedLevel(_ level: CrossfeedLevel) {
+        crossfeed.level = level
+    }
+
+    /// SUAVE → MEDIO → FUERTE → SUAVE.
+    func nextCrossfeedLevel() {
+        crossfeed.level = CrossfeedLevel(index: (crossfeed.level.index + 1) % CrossfeedLevel.allCases.count)
     }
 
     // MARK: - Glow
@@ -85,6 +117,7 @@ final class TubeModel {
         guard Store.isOverridden else { return }
         settings.enabled = true
         settings.warmth = 0.6
+        crossfeed.enabled = true
         demo = [0.82, 0.64]
         glow = demo!
     }
@@ -109,5 +142,10 @@ final class TubeModel {
     private func save() {
         guard !Store.isOverridden, let data = try? JSONEncoder().encode(settings) else { return }
         UserDefaults.standard.set(data, forKey: Self.settingsKey)
+    }
+
+    private func saveCrossfeed() {
+        guard !Store.isOverridden, let data = try? JSONEncoder().encode(crossfeed) else { return }
+        UserDefaults.standard.set(data, forKey: Self.crossfeedKey)
     }
 }

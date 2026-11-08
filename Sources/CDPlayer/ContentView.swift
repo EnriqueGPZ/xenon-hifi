@@ -21,6 +21,11 @@ struct ContentView: View {
             WindowLevel.apply(floating: onTop)
         }
         .task {
+            // Switched on, the whole stack comes up; units are closed one by
+            // one if wanted. Tests and snapshots open their own.
+            if !Store.isOverridden {
+                for unit in UnitStack.order { openWindow(id: unit) }
+            }
             SeedData.insertIfRequested(into: model)
             SelfTest.runIfRequested(model: model)
             Snapshot.runIfRequested(model: model, openSettings: openSettings, openWindow: openWindow)

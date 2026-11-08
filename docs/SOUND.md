@@ -2,14 +2,14 @@
 
 *[Leer en español](SONIDO.md)*
 
-This page explains what XENON does to the sound, step by step, and how each claim is checked. Short version: **with the tubes off, the EQ flat and the volume at maximum, the music reaches your DAC exactly as it is on the disc or in the file, at its own sample rate.** Everything the app adds is optional, and the tests measure it.
+This page explains what XENON does to the sound, step by step, and how each claim is checked. Short version: **with the tubes and crossfeed off, the EQ flat and the volume at maximum, the music reaches your DAC exactly as it is on the disc or in the file, at its own sample rate.** Everything the app adds is optional, and the tests measure it.
 
 ## The path
 
 ```
 CD (.aiff from macOS) ─┐                                                     ┌─► meters
-                       ├─► reader ─► player ─► tube stage ─► equalizer ─► mixer (volume) ─► Core Audio ─► DAC
-FLAC/ALAC/WAV/AIFF/MP3 ┘   (anti-skip) (balance)  (TP-4)       (EQ-10)
+                       ├─► reader ─► player ─► tubes + crossfeed ─► equalizer ─► mixer (volume) ─► Core Audio ─► DAC
+FLAC/ALAC/WAV/AIFF/MP3 ┘   (anti-skip) (balance)      (TP-4)            (EQ-10)
 ```
 
 Inside, everything runs as **32-bit floating point**, the native format of macOS audio. A 32-bit float holds every 16-bit and 24-bit sample exactly, so carrying the music this way loses nothing.
@@ -27,6 +27,8 @@ Inside, everything runs as **32-bit floating point**, the native format of macOS
 Before each song plays, the app sets your DAC to that song's sample rate (`Player/OutputDevice.swift`): 44.1 kHz for a CD, 96 kHz for a 96 kHz file, and so on. Without this, macOS would silently resample everything to whatever rate the DAC was set to. Between songs of different rates there's a short silence while the DAC switches; between songs of the same rate there's no gap.
 
 If the DAC changes rate, is unplugged or comes back, macOS restarts the audio engine and drops what was queued. XENON then reads the music again from the exact second it was at.
+
+**Holding the DAC (optional).** With *Settings ▸ Sonido ▸ Usar el DAC en exclusiva*, XENON takes the DAC for itself while music plays (Core Audio's *hog mode*, `ExclusiveOutput` in `Player/OutputDevice.swift`). No alert, video or other app can mix into the music or change the DAC's rate. macOS sends the other sounds to another output (the Mac's speakers) until you pause or stop; then the DAC is free again, and if the app quits, macOS frees it by itself. Taking the DAC makes macOS move the system's default output, and AVAudioEngine follows the default output a moment later, so XENON waits about 0.3 s and then pins its engine to the DAC: that is the short pause when you press play. It's off by default, and it has been tested with one USB DAC; it uses a standard macOS feature, so other DACs should behave the same.
 
 ## 3. Balance
 
@@ -59,6 +61,21 @@ What the tests measure (`Tests/CDPlayerKitTests/TubeTests.swift`):
 
 On a real 24-bit/176.4 kHz album at 100 % warmth, the average level changed by about 0.01 dB.
 
+### Crossfeed (TP-4), for headphones
+
+With speakers, each ear hears both: the left speaker reaches the right ear too, around the head, a fraction of a millisecond later, softer and without its highs. On headphones each ear hears only its own channel, so the music sits inside the head, and anything mixed to one side only (common on 1960s stereo records) sits glued to one ear. CROSSFEED gives each ear a little of the other channel, the way the head would (`CDPlayerKit/Crossfeed.swift`):
+
+```
+left  = L + g · (low(R) − low(L))
+right = R + g · (low(L) − low(R))
+```
+
+- `low` is a gentle lowpass (6 dB/octave at 650–700 Hz): the highs barely cross, and its phase delays what crosses by `1/(2π·cutoff)`, about **0.23 ms** in the bass, close to the time sound takes around the head. No separate delay is needed.
+- Only the **difference** between the channels crosses, so whatever is the same on both (a voice in the centre) comes out **bit-identical**: no louder, no bass boost. In the bass, a sound mixed fully to one side reaches the other ear `feed` dB softer than its own: `g = a/(1+a)` with `a = 10^(−feed/20)`.
+- Three classic levels: **SUAVE** (Jan Meier, 650 Hz, 9.5 dB), **MEDIO** (Chu Moy, 700 Hz, 6 dB), **FUERTE** (Bauer, 700 Hz, 4.5 dB). Off by default.
+- It sits in the preamp's audio link, after the tubes. The equalizer treats both channels alike, so this sounds the same as putting it last. Off, it's untouched; switching or changing level glides over 30 ms.
+- Measured in the tests: off is bit-identical, the centre is bit-identical, the far ear is `feed` dB down (±0.3 dB) in the bass, a 10 kHz tone crosses more than 20 dB down, the delay is 0.23 ms, switching on mid-song doesn't click, and it works at 192 kHz.
+
 ## 5. The equalizer (EQ-10)
 
 - **Ten bands an octave apart** (31 Hz to 16 kHz, the ISO centres), ±12 dB in 0.5 dB steps, plus a LEVEL control from 0 to −12 dB to make room for boosts.
@@ -81,7 +98,7 @@ The bars, the VU needles, the tube glow and the OVER lights all listen **after t
 
 ## What is bit-perfect, exactly
 
-With **the tubes off, the EQ flat, the balance centred and the volume at maximum**, every stage in the app is a pass-through, and the tests prove each one. The music leaves XENON exactly as it came in, at its own rate. From there, Core Audio hands it to your DAC in the DAC's own format.
+With **the tubes and crossfeed off, the EQ flat, the balance centred and the volume at maximum**, every stage in the app is a pass-through, and the tests prove each one. The music leaves XENON exactly as it came in, at its own rate. From there, Core Audio hands it to your DAC in the DAC's own format.
 
 Known limit: 32-bit *integer* WAV/AIFF files (very rare) are not bit-identical, because the engine works in 32-bit float.
 

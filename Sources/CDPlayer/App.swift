@@ -78,6 +78,16 @@ struct CDPlayerApp: App {
         .windowBackgroundDragBehavior(.disabled)
         .defaultLaunchBehavior(.suppressed)
 
+        // The guide: every unit, how it treats the sound, every control.
+        Window("Ayuda de CDPlayer", id: HelpView.windowID) {
+            HelpView()
+                .environment(model)
+                .themed()
+                .overlay { if GridOverlay.enabled { GridOverlay() } }
+        }
+        .defaultSize(width: 900, height: 640)
+        .defaultLaunchBehavior(.suppressed)
+
         Settings {
             SettingsView()
                 .environment(model)
@@ -159,6 +169,17 @@ struct PlayerCommands: Commands {
                 .keyboardShortcut(.upArrow, modifiers: [.command, .option])
             Button("Menos calidez") { model.tube.nudgeWarmth(by: -1) }
                 .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+            Toggle("Crossfeed (auriculares)", isOn: Binding(get: { model.tube.crossfeed.enabled },
+                                                            set: { _ in model.tube.toggleCrossfeed() }))
+                .keyboardShortcut("c", modifiers: [])
+            Picker("Nivel de crossfeed", selection: Binding(get: { model.tube.crossfeed.level },
+                                                            set: { model.tube.setCrossfeedLevel($0) })) {
+                ForEach(CrossfeedLevel.allCases, id: \.self) { level in
+                    Text(level.label.capitalized).tag(level)
+                }
+            }
+            Button("Siguiente nivel de crossfeed") { model.tube.nextCrossfeedLevel() }
+                .keyboardShortcut("c", modifiers: [.shift])
         }
         // The music file player unit: its buttons, with ⌥ so they never
         // clash with the CD player's.
@@ -196,6 +217,11 @@ struct PlayerCommands: Commands {
                 .disabled(files.current == nil)
             Button("Cambiar vista (álbumes, canciones, carpetas)") { files.toggleList() }
                 .keyboardShortcut("l", modifiers: [.command, .option])
+        }
+        // The help guide (Help/HelpContent.swift).
+        CommandGroup(replacing: .help) {
+            Button("Ayuda de CDPlayer") { openWindow(id: HelpView.windowID) }
+                .keyboardShortcut("?", modifiers: [.command])
         }
     }
 }

@@ -24,6 +24,7 @@ struct GeneralSettings: View {
     @AppStorage("lookUpTitles") private var lookUpTitles = true
     @AppStorage("autoPlay") private var autoPlay = false
     @AppStorage("alwaysOnTop") private var alwaysOnTop = false
+    @AppStorage(ExclusiveOutput.settingKey) private var exclusiveDAC = false
 
     var body: some View {
         Section {
@@ -35,6 +36,14 @@ struct GeneralSettings: View {
         }
         Section("Al meter un CD") {
             Toggle("Empezar a sonar en cuanto se lea", isOn: $autoPlay)
+        }
+        Section {
+            Toggle("Usar el DAC en exclusiva", isOn: $exclusiveDAC)
+                .onChange(of: exclusiveDAC) { ExclusiveOutput.shared.settingChanged() }
+        } header: {
+            Text("Sonido")
+        } footer: {
+            Text("Mientras suena la música, ningún otro sonido del Mac se mezcla con ella ni cambia el DAC: macOS manda los demás sonidos a otra salida (los altavoces del Mac) hasta que pausas o paras. Empieza al pulsar Reproducir.")
         }
         Section {
             Toggle("Siempre en primer plano", isOn: $alwaysOnTop)

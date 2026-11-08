@@ -148,6 +148,7 @@ final class AppModel {
                                    resetPeaks: { playback.resetOvers(); files.playback.resetOvers() })
         // The tubes warm whichever unit sounds, and glow with it.
         tube = TubeModel(send: { playback.tube = $0; files.playback.tube = $0 },
+                         sendCrossfeed: { playback.crossfeed = $0; files.playback.crossfeed = $0 },
                          loudness: { files.isPlaying ? files.playback.recentLoudness() : playback.recentLoudness() })
         files.onStart = { [weak self] in
             self?.pause()

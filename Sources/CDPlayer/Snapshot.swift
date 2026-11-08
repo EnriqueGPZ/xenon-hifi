@@ -8,7 +8,8 @@ import SwiftUI
 /// writes player-light.png and player-dark.png for the main panel, and
 /// settings-<tab>-light.png and settings-<tab>-dark.png for every Settings tab, then quits.
 /// Each PNG gets a <page>-<mode>-layout.json with the grid probes (tools/check-layout.swift).
-/// APP_SNAPSHOT_PAGES=player,settings limits which ones run.
+/// help-<topic>-light.png and -dark.png for every help topic.
+/// APP_SNAPSHOT_PAGES=player,help,settings limits which ones run.
 /// Add APP_ACCENT=<id> to see the pages in another accent.
 enum Snapshot {
     static func runIfRequested(model: AppModel, openSettings: OpenSettingsAction, openWindow: OpenWindowAction) {
@@ -162,6 +163,22 @@ enum Snapshot {
                 NSApp.windows.first { $0.isVisible && $0.identifier?.rawValue.hasPrefix(EqualizerView.windowID) == true }?.close()
                 NSApp.windows.first { $0.isVisible && $0.identifier?.rawValue.hasPrefix(TubeView.windowID) == true }?.close()
                 unit?.close()
+            }
+            // The help guide: every topic, help-<topic>-light/dark.png.
+            if only == nil || only?.contains("help") == true {
+                openWindow(id: HelpView.windowID)
+                try? await Task.sleep(for: .seconds(1.5))
+                let help = NSApp.windows.first { $0.isVisible && $0.identifier?.rawValue.hasPrefix(HelpView.windowID) == true }
+                for mode in ["light", "dark"] {
+                    NSApp.appearance = NSAppearance(named: mode == "light" ? .aqua : .darkAqua)
+                    for topic in HelpTopic.all {
+                        HelpNavigation.shared.topic = topic.id
+                        try? await Task.sleep(for: .seconds(0.8))
+                        capture(to: "\(dir)/help-\(topic.id)-\(mode).png", window: help)
+                    }
+                }
+                HelpNavigation.shared.topic = HelpTopic.all.first?.id
+                help?.close()
             }
             if only == nil || only?.contains("settings") == true {
                 let main = playerWindow
